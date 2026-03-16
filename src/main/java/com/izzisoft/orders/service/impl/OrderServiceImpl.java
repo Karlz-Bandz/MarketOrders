@@ -30,7 +30,7 @@ public class OrderServiceImpl implements OrderService {
     private final ProductClient productClient;
 
     @Override
-    public OrderResponse createOrder(OrderRequest orderRequest) {
+    public OrderResponse createOrder(OrderRequest orderRequest, String userEmail) {
 
         ProductResponse productResponse = productClient.getProductById(orderRequest.productId());
 
@@ -42,7 +42,6 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Too small quantity!");
         }
 
-        //Calculate money value and send payment request to the paypal service
         BigDecimal allProductsValue = productResponse.price().multiply(BigDecimal.valueOf(orderRequest.quantity()));
         log.info("Payment sum = {}", allProductsValue.toString());
 
@@ -50,7 +49,7 @@ public class OrderServiceImpl implements OrderService {
 
         MarketOrder marketOrder = MarketOrder.builder()
                 .productId(productResponse.id())
-                .userEmail(orderRequest.userEmail())
+                .userEmail(userEmail)
                 .status(OrderStatus.CREATED)
                 .quantity(productResponse.quantity())
                 .price(allProductsValue)

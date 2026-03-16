@@ -7,7 +7,7 @@ import com.izzisoft.orders.model.OrderStatus;
 import java.util.List;
 
 public interface OrderService {
-    OrderResponse createOrder(OrderRequest orderRequest);
+    OrderResponse createOrder(OrderRequest orderRequest, String userEmail);
     OrderResponse getOrderById(Long orderId, String userEmail);
     List<OrderResponse> getOrdersByUser(String userEmail);
     List<OrderResponse> getAllOrders();
