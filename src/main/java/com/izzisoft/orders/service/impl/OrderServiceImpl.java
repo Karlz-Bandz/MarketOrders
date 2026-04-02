@@ -2,6 +2,8 @@ package com.izzisoft.orders.service.impl;
 
 import com.izzisoft.orders.dto.OrderRequest;
 import com.izzisoft.orders.dto.OrderResponse;
+import com.izzisoft.orders.dto.PaymentRequest;
+import com.izzisoft.orders.dto.PaymentResponse;
 import com.izzisoft.orders.dto.ProductResponse;
 import com.izzisoft.orders.exception.NotOrderOwnerException;
 import com.izzisoft.orders.exception.OrderNotFoundException;
@@ -9,6 +11,7 @@ import com.izzisoft.orders.model.MarketOrder;
 import com.izzisoft.orders.model.OrderStatus;
 import com.izzisoft.orders.repo.MarketOrderRepo;
 import com.izzisoft.orders.service.OrderService;
+import com.izzisoft.orders.webclient.PaymentClient;
 import com.izzisoft.orders.webclient.ProductClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +31,8 @@ public class OrderServiceImpl implements OrderService {
     private final MarketOrderRepo marketOrderRepo;
 
     private final ProductClient productClient;
+
+    private final PaymentClient paymentClient;
 
     @Override
     public OrderResponse createOrder(OrderRequest orderRequest, String userEmail) {
@@ -58,6 +63,21 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         MarketOrder createdOrder = marketOrderRepo.save(marketOrder);
+
+        PaymentRequest paymentRequest = new PaymentRequest(
+                createdOrder.getId(),
+                allProductsValue,
+                "CARD"
+        );
+
+        PaymentResponse paymentResponse = paymentClient.processPayment(paymentRequest);
+
+        if (paymentResponse.status().equals("SUCCESS")) {
+            createdOrder.setStatus(OrderStatus.PAID);
+        } else {
+            createdOrder.setStatus(OrderStatus.CANCELED);
+            productClient.increaseProductQuantity(productResponse.id(), orderRequest.quantity());
+        }
 
         return new OrderResponse(
                 createdOrder.getId(),

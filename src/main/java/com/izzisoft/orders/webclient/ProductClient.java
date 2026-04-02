@@ -12,14 +12,25 @@ import org.springframework.web.reactive.function.client.WebClient;
 @RequiredArgsConstructor
 public class ProductClient {
 
-    private final WebClient webClient;
+    private final WebClient productWebClient;
 
     private final JwtService jwtService;
+
+    public void increaseProductQuantity(Long productId, int increaseValue) {
+        String serviceToken = jwtService.generateServiceToken();
+
+        productWebClient.put()
+                .uri("/products/increase/{id}/{increaseValue}", productId, increaseValue)
+                .header("Authorization", "Bearer " + serviceToken)
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
 
     public void decreaseProductQuantity(Long productId, int decreaseValue) {
       String serviceToken = jwtService.generateServiceToken();
 
-      webClient.put()
+      productWebClient.put()
                .uri("/products/decrease/{id}/{decreaseValue}", productId, decreaseValue)
                .header("Authorization", "Bearer " + serviceToken)
                .retrieve()
@@ -32,7 +43,7 @@ public class ProductClient {
 
         String userToken = auth.getToken().getTokenValue();
 
-        return webClient.get()
+        return productWebClient.get()
                 .uri("/products/{id}", productId)
                 .header("Authorization", "Bearer " + userToken)
                 .retrieve()
