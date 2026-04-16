@@ -2,6 +2,7 @@ package com.izzisoft.orders.controller;
 
 import com.izzisoft.orders.dto.OrderRequest;
 import com.izzisoft.orders.dto.OrderResponse;
+import com.izzisoft.orders.dto.StatusRequest;
 import com.izzisoft.orders.model.OrderStatus;
 import com.izzisoft.orders.service.OrderService;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +50,8 @@ public class MarketOrderController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{orderId}")
-    public ResponseEntity<Void> updateOrderStatus(@PathVariable("orderId") Long orderId, @RequestBody OrderStatus orderStatus) {
+    public ResponseEntity<Void> updateOrderStatus(@PathVariable("orderId") Long orderId, @RequestBody StatusRequest statusRequest) {
+        OrderStatus orderStatus = statusRequest.status();
         orderService.updateOrderStatus(orderId, orderStatus);
         return new ResponseEntity<>(HttpStatus.CREATED);
     }
