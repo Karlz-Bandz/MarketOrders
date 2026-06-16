@@ -8,6 +8,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(TooSmallProductQuantityException.class)
+    public ResponseEntity<String> handleTooSmallProductQuantityException(TooSmallProductQuantityException ex) {
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(ProductNotExistsException.class)
+    public ResponseEntity<String> handleProductNotExistsException(ProductNotExistsException ex) {
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
+    }
+
     @ExceptionHandler(NotOrderOwnerException.class)
     public ResponseEntity<String> handleNotOrderOwnerException(NotOrderOwnerException ex) {
         return new ResponseEntity<>(ex.getMessage(), HttpStatus.FORBIDDEN);

@@ -7,6 +7,8 @@ import com.izzisoft.orders.dto.PaymentResponse;
 import com.izzisoft.orders.dto.ProductResponse;
 import com.izzisoft.orders.exception.NotOrderOwnerException;
 import com.izzisoft.orders.exception.OrderNotFoundException;
+import com.izzisoft.orders.exception.ProductNotExistsException;
+import com.izzisoft.orders.exception.TooSmallProductQuantityException;
 import com.izzisoft.orders.model.MarketOrder;
 import com.izzisoft.orders.model.OrderStatus;
 import com.izzisoft.orders.repo.MarketOrderRepo;
@@ -14,7 +16,6 @@ import com.izzisoft.orders.service.OrderService;
 import com.izzisoft.orders.webclient.PaymentClient;
 import com.izzisoft.orders.webclient.ProductClient;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +26,6 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class OrderServiceImpl implements OrderService {
 
     private final MarketOrderRepo marketOrderRepo;
@@ -36,27 +36,16 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderResponse createOrder(OrderRequest orderRequest, String userEmail) {
-
         ProductResponse productResponse = productClient.getProductById(orderRequest.productId());
-
-        if (productResponse == null) {
-            throw new RuntimeException("Product not exists");
-        }
-
-        if (productResponse.quantity() < orderRequest.quantity()) {
-            throw new RuntimeException("Too small quantity!");
-        }
-
-        BigDecimal allProductsValue = productResponse.price().multiply(BigDecimal.valueOf(orderRequest.quantity()));
-        log.info("Payment sum = {}", allProductsValue.toString());
-
+        validateProduct(productResponse, orderRequest);
+        BigDecimal allProductsValue = calculateAllProductsValue(productResponse, orderRequest);
         productClient.decreaseProductQuantity(productResponse.id(), orderRequest.quantity());
 
         MarketOrder marketOrder = MarketOrder.builder()
                 .productId(productResponse.id())
                 .userEmail(userEmail)
                 .status(OrderStatus.CREATED)
-                .quantity(productResponse.quantity())
+                .quantity(orderRequest.quantity())
                 .price(allProductsValue)
                 .createdAt(Date.from(Instant.now()))
                 .updatedAt(Date.from(Instant.now()))
@@ -72,10 +61,9 @@ public class OrderServiceImpl implements OrderService {
 
         PaymentResponse paymentResponse = paymentClient.processPayment(paymentRequest);
 
-        if (paymentResponse.status().equals("SUCCESS")) {
-            createdOrder.setStatus(OrderStatus.PAID);
-        } else {
-            createdOrder.setStatus(OrderStatus.CANCELED);
+        updateOrderStatus(createdOrder, paymentResponse);
+
+        if (!"SUCCESS".equals(paymentResponse.status())) {
             productClient.increaseProductQuantity(productResponse.id(), orderRequest.quantity());
         }
 
@@ -90,9 +78,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponse getOrderById(Long orderId, String userEmail) {
 
-        MarketOrder foundOrder = marketOrderRepo.findById(orderId).orElseThrow(
-                () -> new OrderNotFoundException("Order not found in datbase")
-        );
+        MarketOrder foundOrder = getMarketOrderById(orderId);
 
         if (!foundOrder.getUserEmail().equals(userEmail)) {
             throw new NotOrderOwnerException("You are not owner of the order!");
@@ -133,11 +119,35 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void updateOrderStatus(Long orderId, OrderStatus orderStatus) {
+        MarketOrder foundOrder = getMarketOrderById(orderId);
+        foundOrder.setStatus(orderStatus);
+    }
 
-        MarketOrder foundOrder = marketOrderRepo.findById(orderId).orElseThrow(
+    private MarketOrder getMarketOrderById(Long orderId) {
+        return marketOrderRepo.findById(orderId).orElseThrow(
                 () -> new OrderNotFoundException("Order not found!")
         );
+    }
 
-        foundOrder.setStatus(orderStatus);
+    private void updateOrderStatus(MarketOrder createdOrder, PaymentResponse paymentResponse) {
+        if (paymentResponse.status().equals("SUCCESS")) {
+            createdOrder.setStatus(OrderStatus.PAID);
+        } else {
+            createdOrder.setStatus(OrderStatus.CANCELED);
+        }
+    }
+
+    private BigDecimal calculateAllProductsValue(ProductResponse productResponse, OrderRequest orderRequest) {
+        return productResponse.price().multiply(BigDecimal.valueOf(orderRequest.quantity()));
+    }
+
+    private void validateProduct(ProductResponse productResponse, OrderRequest orderRequest) {
+        if (productResponse == null) {
+            throw new ProductNotExistsException("Product not exists!");
+        }
+
+        if (productResponse.quantity() < orderRequest.quantity()) {
+            throw new TooSmallProductQuantityException("Too small quantity!");
+        }
     }
 }
