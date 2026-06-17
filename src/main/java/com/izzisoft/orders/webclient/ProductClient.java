@@ -2,89 +2,57 @@ package com.izzisoft.orders.webclient;
 
 import com.izzisoft.orders.dto.ProductResponse;
 import com.izzisoft.orders.security.JwtService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.HttpHeaders;
+import org.springframework.web.client.RestClient;
 
 @Component
-@RequiredArgsConstructor
 public class ProductClient {
 
-    private static final String PRODUCT_SERVICE_URL = "http://localhost:8080";
-
-    private final RestTemplate restTemplate;
+    private final RestClient restClient;
 
     private final JwtService jwtService;
 
+    public ProductClient(@Value("${url.product}") String url, JwtService jwtService) {
+        this.restClient = RestClient.builder()
+                .baseUrl(url)
+                .build();
+        this.jwtService = jwtService;
+    }
+
     public void increaseProductQuantity(Long productId, int increaseValue) {
-
         String serviceToken = jwtService.generateServiceToken();
+        String url = "/products/increase/{id}/{increaseValue}";
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + serviceToken);
-
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-
-        String url = PRODUCT_SERVICE_URL + "/products/increase/{id}/{increaseValue}";
-
-        restTemplate.exchange(
-                url,
-                HttpMethod.PUT,
-                entity,
-                Void.class,
-                productId,
-                increaseValue
-        );
+        restClient.put()
+                .uri(url, productId, increaseValue)
+                .header("Authorization", "Bearer " + serviceToken)
+                .retrieve()
+                .toBodilessEntity();
     }
 
     public void decreaseProductQuantity(Long productId, int decreaseValue) {
-
         String serviceToken = jwtService.generateServiceToken();
+        String url = "/products/decrease/{id}/{decreaseValue}";
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + serviceToken);
-
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-
-        String url = PRODUCT_SERVICE_URL + "/products/decrease/{id}/{decreaseValue}";
-
-        restTemplate.exchange(
-                url,
-                HttpMethod.PUT,
-                entity,
-                Void.class,
-                productId,
-                decreaseValue
-        );
+        restClient.put()
+                .uri(url, productId, decreaseValue)
+                .header("Authorization", "Bearer " + serviceToken)
+                .retrieve()
+                .toBodilessEntity();
     }
 
     public ProductResponse getProductById(Long productId) {
         JwtAuthenticationToken auth = (JwtAuthenticationToken) SecurityContextHolder.getContext().getAuthentication();
-
         String userToken = auth.getToken().getTokenValue();
+        String url =  "/products/{id}";
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + userToken);
-
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-
-        String url = PRODUCT_SERVICE_URL + "/products/{id}";
-
-        ResponseEntity<ProductResponse> response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                entity,
-                ProductResponse.class,
-                productId
-
-        );
-
-        return response.getBody();
+        return restClient.get()
+                .uri(url, productId)
+                .header("Authorization", "Bearer " + userToken)
+                .retrieve()
+                .body(ProductResponse.class);
     }
 }
