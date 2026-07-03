@@ -34,7 +34,7 @@ public class MarketOrder {
     private BigDecimal price;
 
     @Enumerated(EnumType.STRING)
-    private OrderStatus status;
+    private PaymentStatus status;
 
     private Date createdAt;
 

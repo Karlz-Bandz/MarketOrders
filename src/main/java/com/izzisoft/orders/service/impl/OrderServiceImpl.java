@@ -1,21 +1,20 @@
 package com.izzisoft.orders.service.impl;
 
+import com.izzisoft.kafka.PaymentEvent;
 import com.izzisoft.orders.dto.OrderRequest;
 import com.izzisoft.orders.dto.OrderResponse;
-import com.izzisoft.orders.dto.PaymentRequest;
-import com.izzisoft.orders.dto.PaymentResponse;
 import com.izzisoft.orders.dto.ProductResponse;
 import com.izzisoft.orders.exception.NotOrderOwnerException;
 import com.izzisoft.orders.exception.OrderNotFoundException;
 import com.izzisoft.orders.exception.ProductNotExistsException;
 import com.izzisoft.orders.exception.TooSmallProductQuantityException;
 import com.izzisoft.orders.model.MarketOrder;
-import com.izzisoft.orders.model.OrderStatus;
+import com.izzisoft.orders.model.PaymentStatus;
 import com.izzisoft.orders.repo.MarketOrderRepo;
 import com.izzisoft.orders.service.OrderService;
-import com.izzisoft.orders.webclient.PaymentClient;
 import com.izzisoft.orders.webclient.ProductClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +31,7 @@ public class OrderServiceImpl implements OrderService {
 
     private final ProductClient productClient;
 
-    private final PaymentClient paymentClient;
+    private final KafkaTemplate<String, PaymentEvent> kafkaTemplate;
 
     @Override
     public OrderResponse createOrder(OrderRequest orderRequest, String userEmail) {
@@ -44,7 +43,7 @@ public class OrderServiceImpl implements OrderService {
         MarketOrder marketOrder = MarketOrder.builder()
                 .productId(productResponse.id())
                 .userEmail(userEmail)
-                .status(OrderStatus.CREATED)
+                .status(PaymentStatus.CREATED)
                 .quantity(orderRequest.quantity())
                 .price(allProductsValue)
                 .createdAt(Date.from(Instant.now()))
@@ -53,19 +52,15 @@ public class OrderServiceImpl implements OrderService {
 
         MarketOrder createdOrder = marketOrderRepo.save(marketOrder);
 
-        PaymentRequest paymentRequest = new PaymentRequest(
+        PaymentEvent paymentEvent = new PaymentEvent(
                 createdOrder.getId(),
+                orderRequest.productId(),
+                orderRequest.quantity(),
                 allProductsValue,
                 "CARD"
         );
 
-        PaymentResponse paymentResponse = paymentClient.processPayment(paymentRequest);
-
-        updateOrderStatus(createdOrder, paymentResponse);
-
-        if (!"SUCCESS".equals(paymentResponse.status())) {
-            productClient.increaseProductQuantity(productResponse.id(), orderRequest.quantity());
-        }
+        kafkaTemplate.send("payment", paymentEvent);
 
         return new OrderResponse(
                 createdOrder.getId(),
@@ -77,7 +72,6 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderResponse getOrderById(Long orderId, String userEmail) {
-
         MarketOrder foundOrder = getMarketOrderById(orderId);
 
         if (!foundOrder.getUserEmail().equals(userEmail)) {
@@ -118,7 +112,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public void updateOrderStatus(Long orderId, OrderStatus orderStatus) {
+    public void updateOrderStatus(Long orderId, PaymentStatus orderStatus) {
         MarketOrder foundOrder = getMarketOrderById(orderId);
         foundOrder.setStatus(orderStatus);
     }
@@ -127,14 +121,6 @@ public class OrderServiceImpl implements OrderService {
         return marketOrderRepo.findById(orderId).orElseThrow(
                 () -> new OrderNotFoundException("Order not found!")
         );
-    }
-
-    private void updateOrderStatus(MarketOrder createdOrder, PaymentResponse paymentResponse) {
-        if (paymentResponse.status().equals("SUCCESS")) {
-            createdOrder.setStatus(OrderStatus.PAID);
-        } else {
-            createdOrder.setStatus(OrderStatus.CANCELED);
-        }
     }
 
     private BigDecimal calculateAllProductsValue(ProductResponse productResponse, OrderRequest orderRequest) {

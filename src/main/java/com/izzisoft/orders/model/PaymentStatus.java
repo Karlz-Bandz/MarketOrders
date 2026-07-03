@@ -1,5 +1,5 @@
 package com.izzisoft.orders.model;
 
-public enum OrderStatus {
+public enum PaymentStatus {
     PAID, PENDING, CANCELED, CREATED, FINISHED
 }

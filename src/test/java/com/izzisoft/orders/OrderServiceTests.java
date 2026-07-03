@@ -1,18 +1,17 @@
 package com.izzisoft.orders;
 
+import com.izzisoft.kafka.PaymentEvent;
 import com.izzisoft.orders.dto.OrderRequest;
 import com.izzisoft.orders.dto.OrderResponse;
-import com.izzisoft.orders.dto.PaymentResponse;
 import com.izzisoft.orders.dto.ProductResponse;
 import com.izzisoft.orders.exception.NotOrderOwnerException;
 import com.izzisoft.orders.exception.OrderNotFoundException;
 import com.izzisoft.orders.exception.ProductNotExistsException;
 import com.izzisoft.orders.exception.TooSmallProductQuantityException;
 import com.izzisoft.orders.model.MarketOrder;
-import com.izzisoft.orders.model.OrderStatus;
+import com.izzisoft.orders.model.PaymentStatus;
 import com.izzisoft.orders.repo.MarketOrderRepo;
 import com.izzisoft.orders.service.impl.OrderServiceImpl;
-import com.izzisoft.orders.webclient.PaymentClient;
 import com.izzisoft.orders.webclient.ProductClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import java.math.BigDecimal;
 import java.util.Date;
@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,7 +46,7 @@ class OrderServiceTests {
     private ProductClient productClient;
 
     @Mock
-    private PaymentClient paymentClient;
+    private KafkaTemplate<String, PaymentEvent> kafkaTemplate;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -131,45 +132,13 @@ class OrderServiceTests {
     }
 
     @Test
-    void shouldCancelOrderAfterUnsuccessfulPayment() {
-
-        MarketOrder mockSavedOrder = MarketOrder.builder()
-                .id(1L)
-                .productId(1L)
-                .userEmail("test@test.com")
-                .status(OrderStatus.CREATED)
-                .price(BigDecimal.valueOf(2000))
-                .quantity(2)
-                .createdAt(new Date())
-                .updatedAt(new Date())
-                .build();
-
-        when(productClient.getProductById(1L)).thenReturn(productResponse);
-        when(marketOrderRepo.save(any())).thenReturn(mockSavedOrder);
-        when(paymentClient.processPayment(any())).thenReturn(
-                new PaymentResponse(1L, "CANCELLED")
-        );
-
-        OrderResponse response = orderService.createOrder(orderRequest, "test@test.com");
-
-        assertNotNull(response);
-        assertEquals(OrderStatus.CANCELED, response.status());
-        assertEquals(BigDecimal.valueOf(2000), response.price());
-
-
-        verify(paymentClient).processPayment(any());
-        verify(productClient).increaseProductQuantity(1L, 2);
-        verify(productClient).decreaseProductQuantity(1L, 2);
-    }
-
-    @Test
     void shouldCreateOrderSuccessfully() {
 
         MarketOrder savedOrder = MarketOrder.builder()
                 .id(1L)
                 .productId(1L)
                 .userEmail("test@test.com")
-                .status(OrderStatus.CREATED)
+                .status(PaymentStatus.CREATED)
                 .price(BigDecimal.valueOf(2000))
                 .quantity(2)
                 .createdAt(new Date())
@@ -178,17 +147,15 @@ class OrderServiceTests {
 
         when(productClient.getProductById(1L)).thenReturn(productResponse);
         when(marketOrderRepo.save(any())).thenReturn(savedOrder);
-        when(paymentClient.processPayment(any()))
-                .thenReturn(new PaymentResponse(1L, "SUCCESS"));
 
         OrderResponse response = orderService.createOrder(orderRequest, "test@test.com");
 
         assertNotNull(response);
-        assertEquals(OrderStatus.PAID, response.status());
+        assertEquals(PaymentStatus.CREATED, response.status());
         assertEquals(BigDecimal.valueOf(2000), response.price());
 
         verify(productClient).decreaseProductQuantity(1L, 2);
-        verify(paymentClient).processPayment(any());
+        verify(kafkaTemplate).send(eq("payment"), any(PaymentEvent.class));
         verify(productClient, never()).increaseProductQuantity(anyLong(), anyInt());
     }
 }

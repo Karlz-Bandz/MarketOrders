@@ -1,6 +1,6 @@
 package com.izzisoft.orders.dto;
 
-import com.izzisoft.orders.model.OrderStatus;
+import com.izzisoft.orders.model.PaymentStatus;
 
-public record StatusRequest(OrderStatus status) {
+public record StatusRequest(PaymentStatus status) {
 }

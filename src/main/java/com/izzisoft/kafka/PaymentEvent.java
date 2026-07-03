@@ -1,9 +1,11 @@
-package com.izzisoft.orders.dto;
+package com.izzisoft.kafka;
 
 import java.math.BigDecimal;
 
-public record PaymentRequest(
+public record PaymentEvent(
         Long orderId,
+        Long productId,
+        int productsAmount,
         BigDecimal amount,
         String paymentMethod
 ) {
