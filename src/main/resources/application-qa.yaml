@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/market_orders_db
+    username: postgres
+    password: password
+
+  kafka:
+    bootstrap-servers: kafka:9092
+
+jwt:
+  public-service-key-path: /app/certs/service-public.pem
+  private-service-key-path: /app/certs/service-private.pem
+  public-key-path: /app/certs/public.pem
+
+url:
+  product: http://product-service:8080

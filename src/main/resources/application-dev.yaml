@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/market_orders_db
+    username: ${MARKET_USER}
+    password: ${MARKET_PASS}
+
+jwt:
+  public-service-key-path: ../certs/service-public.pem
+  private-service-key-path: ../certs/service-private.pem
+  public-key-path: ../certs/public.pem
+
+url:
+  product: http://localhost:8080

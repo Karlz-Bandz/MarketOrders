@@ -6,6 +6,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -40,6 +41,15 @@ import java.util.Base64;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    @Value("${jwt.public-key-path}")
+    private String publicKeyPath;
+
+    @Value("${jwt.public-service-key-path}")
+    private String publicServiceKeyPath;
+
+    @Value("${jwt.private-service-key-path}")
+    private String privateServiceKeyPath;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -64,8 +74,8 @@ public class SecurityConfig {
                         .authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt ->
-                            jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())
-                        ))
+                        jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())
+                ))
                 .sessionManagement(
                         session -> session
                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -85,8 +95,8 @@ public class SecurityConfig {
 
     @Bean
     public JwtEncoder jwtEncoder() throws Exception {
-        RSAPublicKey publicKey = loadPublicKey("../certs/service-public.pem");
-        RSAPrivateKey privateKey = loadPrivateKey("../certs/service-private.pem");
+        RSAPublicKey publicKey = loadPublicKey(publicServiceKeyPath);
+        RSAPrivateKey privateKey = loadPrivateKey(privateServiceKeyPath);
 
         JWK jwk = new RSAKey.Builder(publicKey)
                 .privateKey(privateKey)
@@ -98,7 +108,7 @@ public class SecurityConfig {
 
     @Bean
     public JwtDecoder jwtDecoder() throws Exception {
-        RSAPublicKey publicKey = loadPublicKey("../certs/public.pem");
+        RSAPublicKey publicKey = loadPublicKey(publicKeyPath);
         return NimbusJwtDecoder.withPublicKey(publicKey).build();
     }
 

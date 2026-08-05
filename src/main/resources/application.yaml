@@ -4,11 +4,10 @@ server:
 spring:
   application:
     name: orders
+  profiles:
+    default: dev
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/market_orders_db
-    username: ${MARKET_USER}
-    password: ${MARKET_PASS}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -18,8 +17,6 @@ spring:
     show-sql: true
 
   kafka:
-    bootstrap-servers: localhost:9092
-
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -34,6 +31,3 @@ spring:
           json:
             trusted:
               packages: com.izzisoft.kafka
-
-url:
-  product: http://localhost:8080
